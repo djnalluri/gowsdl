@@ -9,6 +9,8 @@ import (
 	"github.com/hooklift/gowsdl/soap"
 )
 
+//go:generate go run ../../cmd/gowsdl -p gen ../../fixtures/test.wsdl
+
 var done = make(chan struct{})
 
 func client() {
