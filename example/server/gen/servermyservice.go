@@ -185,11 +185,20 @@ type SOAPBodyResponse struct {
 	GetInfo *GetInfoResponse `xml:",omitempty"`
 }
 
-func (service *SOAPBodyRequest) GetInfoFunc(request *GetInfo) (*GetInfoResponse, error) {
+type SOAPService interface {
+	GetInfoFunc(request *GetInfo) (*GetInfoResponse, error)
+}
+
+type BaseSOAPService struct{}
+
+var _ SOAPService = (*BaseSOAPService)(nil)
+
+func (service *BaseSOAPService) GetInfoFunc(request *GetInfo) (*GetInfoResponse, error) {
 	return nil, WSDLUndefinedError
 }
 
-func (service *SOAPEnvelopeRequest) call(w http.ResponseWriter, r *http.Request) {
+func call(s SOAPService, w http.ResponseWriter, r *http.Request) {
+	service := &SOAPEnvelopeRequest{}
 	w.Header().Add("Content-Type", "text/xml; charset=utf-8")
 	val := reflect.ValueOf(&service.Body).Elem()
 	n := val.NumField()
@@ -242,7 +251,7 @@ func (service *SOAPEnvelopeRequest) call(w http.ResponseWriter, r *http.Request)
 	if !find {
 		panic(WSDLUndefinedError)
 	} else {
-		m := val.Addr().MethodByName(name + "Func")
+		m := reflect.ValueOf(s).MethodByName(name + "Func")
 		if !m.IsValid() {
 			panic(WSDLUndefinedError)
 		}
@@ -257,7 +266,14 @@ func (service *SOAPEnvelopeRequest) call(w http.ResponseWriter, r *http.Request)
 
 }
 
+func CreateEndpoint(service SOAPService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		call(service, w, r)
+	}
+}
+
+// Deprecated: Use CreateEndpoint instead.
 func Endpoint(w http.ResponseWriter, r *http.Request) {
-	request := SOAPEnvelopeRequest{}
-	request.call(w, r)
+	service := BaseSOAPService{}
+	call(&service, w, r)
 }
